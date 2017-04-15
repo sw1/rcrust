@@ -6,4 +6,4 @@ picrust_starting_files/
 MiSeq_SOP/
 asr/
 .Rproj.user
-.Rproj.user/
+.Rproj.user/**
