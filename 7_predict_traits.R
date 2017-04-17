@@ -6,7 +6,7 @@ weighting <- 'exponential'
 asr_picrust <- read.delim('~/rcrust/asr/KEGG_asr_counts.tab',sep='\t')
 
 reconstructed_trait_table <- readRDS('~/rcrust/asr.rds')
-tree_full <- read.tree('~/rcrust/tree.tree')
+tree_full <- read.tree('~/rcrust/out/16S/reference_tree.newick')
 observed_trait_table <- read.delim('out/KEGG/trait_table.tab',sep='\t')
 rownames(observed_trait_table) <- observed_trait_table$GenomeID
 observed_trait_table <- observed_trait_table[,-1]
