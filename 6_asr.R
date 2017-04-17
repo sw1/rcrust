@@ -1,4 +1,3 @@
-library(phytools)
 library(ape)
 
 asr_picrust <- read.delim('~/rcrust/asr/KEGG_asr_counts.tab',sep='\t')
@@ -25,7 +24,7 @@ just_ace_matrix <- do.call(cbind,just_ace)
 # write.table(out_matrix,file=count_out_file,row.names=FALSE,quote=FALSE, sep="\t")
 rownames(just_ace_matrix) <- tree$node.label # picrust names the 0 node "root"
 
-saveRDS(just_ace_matrix,'~/rcrust/acr.rds')
+saveRDS(just_ace_matrix,'~/rcrust/asr.rds')
 
 
 

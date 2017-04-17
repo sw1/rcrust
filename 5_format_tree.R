@@ -3,7 +3,7 @@ library(ape)
 tree_pruned_picrust <- read.tree('out/KEGG/pruned_tree.newick')
 trait_table <- read.delim('out/KEGG/trait_table.tab',sep='\t')
 
-tree_full <- read.tree('out/KEGG/reference_tree.newick')
+tree_full <- read.tree('~/rcrust/out/KEGG/reference_tree.newick')
 keggGenome_counts <- read.delim('picrust_starting_files/IMG_ko_counts.tab',sep='\t')
 otu_to_keggGenome <- read.delim('gg_13_5_img.txt',sep='\t')
 
