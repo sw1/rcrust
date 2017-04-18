@@ -3,10 +3,16 @@ library(ape)
 tree_pruned_picrust <- read.tree('out/KEGG/pruned_tree.newick')
 trait_table <- read.delim('out/KEGG/trait_table.tab',sep='\t')
 
-tree_full <- read.tree('~/rcrust/out/KEGG/reference_tree.newick')
+# tree_full <- read.tree('~/rcrust/out/KEGG/reference_tree.newick')
+tree_full <- read.tree('~/rcrust/tree.tree')
+#tree_full <- root(tree_full,tree_full$tip.label[1],resolve.root=TRUE)
+tree_full <- multi2di(tree_full,random=FALSE)
+tree_full$node.label <- paste0('internal_node_',seq_len(length(unique(tree_full$edge[,1]))))
+tree_full$edge.length[tree_full$edge.length < .0001] <- .0001
+# tree_full <- root(reorder.phylo(tree_full,order='postorder'),length(tree_full$tip.label),resolve.root=TRUE)
+
 keggGenome_counts <- read.delim('picrust_starting_files/IMG_ko_counts.tab',sep='\t')
 otu_to_keggGenome <- read.delim('gg_13_5_img.txt',sep='\t')
-
 
 # R style
 
