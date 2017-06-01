@@ -26,6 +26,7 @@ tree_pruned <- drop.tip(tree_full,tip=tree_full$tip.label[!(tree_full$tip.label 
 traits_pruned <- keggGenome_counts[keggGenome_counts$GenomeID %in% parsed$img_genome_id,]
 rownames(traits_pruned) <- parsed[as.character(traits_pruned$GenomeID),'X.gg_id']
 
+saveRDS(list(traits=traits_pruned,tree=tree_pruned),'~/rcrust/full.rds')
 saveRDS(list(traits=traits_pruned,tree=tree_pruned),'~/rcrust/pruned.rds')
 
 
