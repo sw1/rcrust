@@ -1,25 +1,143 @@
-nexp <- function(d) exp(1)^(-d)
+library(ape)
+library(phangorn)
 
-method <- 'asr_and_weighting'
-weighting <- 'exponential'
+options(digits=10) 
 
-asr_picrust <- read.delim('~/rcrust/asr/KEGG_asr_counts.tab',sep='\t')
+nexp <- function(x) exp(1)^(-x) # -1x
 
-reconstructed_trait_table <- readRDS('~/rcrust/asr.rds')
-tree_full <- read.tree('~/rcrust/out/KEGG/reference_tree.newick')
-observed_trait_table <- read.delim('out/KEGG/trait_table.tab',sep='\t')
-rownames(observed_trait_table) <- observed_trait_table$GenomeID
-observed_trait_table <- observed_trait_table[,-1]
+predict_tip <- function(tree,node,mrra,mrra_idx,traits,node_dist){
+  
+  parent <- Ancestors(tree,node,type='parent')
+  children <- Children(tree,parent)
+  
+  if (is.null(mrra)){
+    
+    ancestor_trait <- NULL
+    ancestor_d <- NULL
+    ancestor_w <- NULL
+    
+  }else{
+  
+    ancestor_trait <- traits[mrra,]
+    ancestor_d <- node_dist[parent,mrra_idx]
+    ancestor_w <- nexp(ancestor_d)
+      
+  }
+  
+  if (is.null(ancestor_trait)){
+    
+    pred <- NULL
+    total_w <- NULL
+    
+  }else{
+    
+    pred <- ancestor_trait * ancestor_w
+    total_w <- ancestor_w
+    
+  }
+  
+  for (i in children){
+    
+    child <- tree$tip.label[i]
+    
+    if (child %in% rownames(traits)){
+      
+      child_trait <- traits[child,]
+      child_parent_d <- node_dist[parent,i]
+      child_parent_w <- nexp(child_parent_d)
+     
+      if (is.null(pred) && is.null(total_w)){
+        
+        total_w <- total_w + child_parent_w
+        pred <- child_trait * child_parent_w
+        
+      }else{
+        
+        pred <- pred + child_trait * child_parent_w
+        total_w <- total_w + child_parent_w
+        
+      }
+      
+    }
+    
+  }
+  
+  if (is.null(pred)) return(NULL)
+  
+  pred <- unlist(pred/total_w)
+  
+  return(pred)
+  
+}
 
-traits <- rbind(observed_trait_table,reconstructed_trait_table)
+
+# prepare traits
+trait_asr_table <- read.delim('/data/sw1/rcrust/asr/KEGG_asr_counts.tab',sep='\t',stringsAsFactors=FALSE)
+rownames(trait_asr_table) <- trait_asr_table[,1]
+trait_asr_table <- trait_asr_table[,-1]
+
+trait_table <- read.delim('/data/sw1/rcrust/out/KEGG/trait_table.tab',sep='\t',stringsAsFactors=FALSE)
+rownames(trait_table) <- trait_table[,1]
+trait_table <- trait_table[,-1]
+trait_table <- trait_table[,colnames(trait_asr_table)]
+
+traits <- rbind(trait_asr_table,trait_table)
+
+
+
+# get nodes to predict
+pitree <- read.tree('~/rcrust/tree_before_predictnode.tree')
+
+# picrust has internal_node_0 for root, probably remove and keep as root for mine
+pitree$node.label[which(pitree$node.label == "'internal_node_0'")] <- 'root'
+
+
+node_dist <- dist.nodes(pitree)
+
+profvis({
+
+recons <- matrix(0.0,length(pitree$tip.label),ncol(traits),dimnames=list(pitree$tip.label,colnames(traits)))
+for (i in 1:5){ #seq_along(pitree$tip.label)){
+  
+  node_to_predict <- pitree$tip.label[i] # pitree$tip.label == nodes_to_predict
+  
+  cat(sprintf('%s: Tip %s... ',i,node_to_predict))
+  
+  # reconstruction
+  ancestors <- Ancestors(pitree,i,type='all')
+  mrra <- NULL
+  for (j in ancestors){
+    ancestor <- pitree$node.label[j - length(pitree$tip.label)]
+    if (ancestor %in% rownames(traits)){
+      mrra <- ancestor
+      mrra_idx <- j
+      break
+    }
+  }
+  
+  cat(sprintf('predicting with mrra %s\n',mrra))
+  pred <- round(predict_tip(pitree,i,mrra,mrra_idx,traits,node_dist))
+  
+  
+  # update reconstruction table
+  if (node_to_predict %in% rownames(traits)){
+    recons[node_to_predict,] <- unlist(traits[node_to_predict,])
+  }else{
+    recons[node_to_predict,] <- pred
+  }
+  
+}
+
+
+})
 
 
 
 
 
-test <- read.delim('~/rcrust/new_refs/ko_13_5_precalculated.tab',sep='\t')
-test_steps <- read.delim('~/MiscOut/testTable.tab',sep='\t')
-
-
-
-preorder <- reorder.phylo(tree_full,order='cladewise')
+# 
+# Ancestors(pitree,10,type='all')
+# Children(pitree,Ancestors(pitree,10,type='all'))
+# 
+# lapply(Ancestors(pitree,10,type='all'),function(x) pitree$edge[pitree$edge[,1] %in% x,])
+# lapply(Ancestors(pitree,10,type='all'),function(x) pitree$edge.length[pitree$edge[,1] %in% x])
