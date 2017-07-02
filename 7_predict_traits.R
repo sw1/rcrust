@@ -17,11 +17,11 @@ predict_tip <- function(tree,node,mrra,mrra_idx,traits,node_dist){
     ancestor_w <- NULL
     
   }else{
-  
+    
     ancestor_trait <- traits[mrra,]
     ancestor_d <- node_dist[parent,mrra_idx]
     ancestor_w <- nexp(ancestor_d)
-      
+    
   }
   
   if (is.null(ancestor_trait)){
@@ -45,7 +45,7 @@ predict_tip <- function(tree,node,mrra,mrra_idx,traits,node_dist){
       child_trait <- traits[child,]
       child_parent_d <- node_dist[parent,i]
       child_parent_w <- nexp(child_parent_d)
-     
+      
       if (is.null(pred) && is.null(total_w)){
         
         total_w <- total_w + child_parent_w
@@ -64,40 +64,52 @@ predict_tip <- function(tree,node,mrra,mrra_idx,traits,node_dist){
   
   if (is.null(pred)) return(NULL)
   
-  pred <- unlist(pred/total_w)
+  pred <- pred/total_w
   
   return(pred)
   
 }
 
 
-# prepare traits
-trait_asr_table <- read.delim('/data/sw1/rcrust/asr/KEGG_asr_counts.tab',sep='\t',stringsAsFactors=FALSE)
-rownames(trait_asr_table) <- trait_asr_table[,1]
-trait_asr_table <- trait_asr_table[,-1]
+# answer
+final_picrust_table <- read.delim('~/rcrust/new_refs/ko_13_5_precalculated.tab',sep='\t')
+rownames(final_picrust_table) <- final_picrust_table$X.OTU_IDs
+final_picrust_table <- final_picrust_table[,-1]
+
+# # prepare traits (from picrust format_tree_and_trait_table)
+# trait_asr_table <- read.delim('/data/sw1/rcrust/asr/KEGG_asr_counts.tab',sep='\t',stringsAsFactors=FALSE)
+# rownames(trait_asr_table) <- trait_asr_table[,1]
+# trait_asr_table <- trait_asr_table[,-1]
+
+# prepare traits (from r 6_asr.R)
+trait_asr_table <- readRDS('~/rcrust/asr.rds')
+
 
 trait_table <- read.delim('/data/sw1/rcrust/out/KEGG/trait_table.tab',sep='\t',stringsAsFactors=FALSE)
 rownames(trait_table) <- trait_table[,1]
 trait_table <- trait_table[,-1]
 trait_table <- trait_table[,colnames(trait_asr_table)]
 
-traits <- rbind(trait_asr_table,trait_table)
+
+prepared_data <- readRDS('~/rcrust/pruned.rds')
+trait_table <- prepared_data$traits[,-1]
+trait_table <- trait_table[,colnames(trait_asr_table)]
+
+traits <- as.matrix(rbind(trait_asr_table,trait_table))
 
 
+# this is the preprocessed tree from picrust right before predict nodes
+# # get nodes to predict
+# pitree <- read.tree('~/rcrust/tree_before_predictnode.tree')
+# # picrust has internal_node_0 for root, probably remove and keep as root for mine
+# pitree$node.label[which(pitree$node.label == "'internal_node_0'")] <- 'root'
 
-# get nodes to predict
-pitree <- read.tree('~/rcrust/tree_before_predictnode.tree')
-
-# picrust has internal_node_0 for root, probably remove and keep as root for mine
-pitree$node.label[which(pitree$node.label == "'internal_node_0'")] <- 'root'
-
+pitree <- prepared_data$tree_full
 
 node_dist <- dist.nodes(pitree)
 
-profvis({
-
 recons <- matrix(0.0,length(pitree$tip.label),ncol(traits),dimnames=list(pitree$tip.label,colnames(traits)))
-for (i in 1:5){ #seq_along(pitree$tip.label)){
+for (i in seq_along(pitree$tip.label)){
   
   node_to_predict <- pitree$tip.label[i] # pitree$tip.label == nodes_to_predict
   
@@ -121,15 +133,12 @@ for (i in 1:5){ #seq_along(pitree$tip.label)){
   
   # update reconstruction table
   if (node_to_predict %in% rownames(traits)){
-    recons[node_to_predict,] <- unlist(traits[node_to_predict,])
+    recons[node_to_predict,] <- traits[node_to_predict,]
   }else{
     recons[node_to_predict,] <- pred
   }
   
 }
-
-
-})
 
 
 
