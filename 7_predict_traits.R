@@ -93,11 +93,6 @@ final_picrust_table <- final_picrust_table[,-1]
 # prepare traits (from r 6_asr.R)
 trait_asr_table <- readRDS('~/rcrust/asr.rds')
 
-trait_table <- read.delim('/data/sw1/rcrust/out/KEGG/trait_table.tab',sep='\t',stringsAsFactors=FALSE)
-rownames(trait_table) <- trait_table[,1]
-trait_table <- trait_table[,-1]
-trait_table <- trait_table[,colnames(trait_asr_table)]
-
 prepared_data <- readRDS('~/rcrust/pruned.rds')
 trait_table <- prepared_data$traits[,-1]
 trait_table <- trait_table[,colnames(trait_asr_table)]
