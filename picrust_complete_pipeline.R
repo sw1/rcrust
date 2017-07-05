@@ -14,7 +14,7 @@ system2(format_tree_and_trait_table,
 
 cat('Formatting traits for ko\n')
 system2(format_tree_and_trait_table,
-        args=c('-t','~/rcrust/tree.tree',
+        args=c('-t','~/rcrust/testing_workflow/rtree.tree',
                '-i','~/rcrust/picrust_starting_files/IMG_ko_counts.tab',
                '-m','~/rcrust/gg_13_5_img.txt',
                '-o','~/rcrust/testing_workflow/out/KEGG/'))

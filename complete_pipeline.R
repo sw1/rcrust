@@ -183,7 +183,10 @@ format_tree_and_traits <- function(tree,verbose=FALSE){
   
   if (verbose) cat('Formatting tree and traits... ')
   pruned_ko <- prune_tree_and_traits(tree,img_ko,otu_img)
+  pruned_ko$tree$node.label[pruned_ko$tree$node.label == get_node_label(pruned_ko$tree,getRoot(pruned_ko$tree))] <- 'root'
   pruned_16s <- prune_tree_and_traits(tree,img_16s,otu_img)
+  pruned_16s$tree$node.label[pruned_16s$tree$node.label == get_node_label(pruned_16s$tree,getRoot(pruned_16s$tree))] <- 'root'
+  tree$node.label[tree$node.label == get_node_label(tree,getRoot(tree))] <- 'root'
   if (verbose) cat('complete.\n')
   
   out <- list(ko=pruned_ko,`16s`=pruned_16s,tree=tree)
@@ -278,8 +281,8 @@ final_picrust_table_16s <- final_picrust_table_16s[,-1,drop=FALSE]
 
 
 # check
-cbind(rowSums(reconstruction_ko),rowSums(final_picrust_table_ko[rownames(reconstruction_ko),]))
-cbind(reconstruction_16s,final_picrust_table_16s[rownames(reconstruction_16s),])
+which(rowSums(reconstruction_ko) != rowSums(final_picrust_table_ko[rownames(reconstruction_ko),]))
+which(reconstruction_16s != final_picrust_table_16s[rownames(reconstruction_16s),])
 
 
 # ddna <- dist.dna(alignment_phydat)
