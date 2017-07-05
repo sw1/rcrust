@@ -3,7 +3,7 @@ library(ape)
 library(phangorn)
 library(DECIPHER)
 
-nexp <- function(x) exp(1)^(-x) # -1x
+nexp <- function(x) exp(1)^(-x)
 
 get_node_label <- function(tree,idx){
   if (idx > length(tree$tip.label)){
@@ -47,7 +47,6 @@ predict_tip <- function(tree,node,mrra,mrra_idx,traits,node_dist){
   
   for (i in children){
     
-    # child <- tree$tip.label[i]
     child <- get_node_label(tree,i)
     
     if (child %in% rownames(traits)){
@@ -58,7 +57,7 @@ predict_tip <- function(tree,node,mrra,mrra_idx,traits,node_dist){
       
       if (is.null(pred) && is.null(total_w)){
         
-        total_w <- total_w + child_parent_w
+        total_w <- child_parent_w
         pred <- child_trait * child_parent_w
         
       }else{
@@ -72,7 +71,7 @@ predict_tip <- function(tree,node,mrra,mrra_idx,traits,node_dist){
     
   }
   
-  if (is.null(pred)) return(NULL)
+  if (is.null(pred)) return(NA)
   
   pred <- pred/total_w
   
@@ -118,7 +117,10 @@ create_fasta <- function(abundance,path,rows_are_taxa,verbose=FALSE){
   
 }
 
-create_tree_and_traits <- function(fasta,ncores=1,verbose=FALSE){
+create_tree <- function(fasta,fun_dist,fun_tree,ncores=1,verbose=FALSE){
+  
+  fun_dist <- match.fun(fun_dist)
+  fun_tree <- match.fun(fun_tree)
   
   if (verbose) cat('Performing alignment... ')
   seqs <- sread(fasta)
@@ -134,11 +136,11 @@ create_tree_and_traits <- function(fasta,ncores=1,verbose=FALSE){
   if (verbose) cat('complete.\n')
   
   if (verbose) cat('Computing pairwise distances... ')
-  d <- dist.ml(alignment)
+  d <- fun_dist(alignment)
   if (verbose) cat('complete.\n')
   
   if (verbose) cat('Creating tree... ')
-  tree <- nj(d) 
+  tree <- fun_tree(d) 
   if (verbose) cat('complete.\n')
   
   if (verbose) cat('Formatting tree and traits... ')
@@ -146,30 +148,54 @@ create_tree_and_traits <- function(fasta,ncores=1,verbose=FALSE){
   tree$node.label <- paste0('internal_node_',seq_along(unique(tree$edge[,1])))
   tree$edge.length[tree$edge.length < .0001] <- .0001
   
-  img_ko <- read.delim(file.path(attr(fasta,'path'),'IMG_ko_counts.tab'),sep='\t')
-  otu_img <- read.delim(file.path(attr(fasta,'path'),'gg_13_5_img.txt'),sep='\t')
+  attr(tree,'path') <- attr(fasta,'path')
+          
+  return(tree)
+  
+}
+
+prune_tree_and_traits <- function(tree,img_x,otu_img){
   
   otu_img <- otu_img[!duplicated(otu_img$img_genome_id,fromLast=TRUE),]
   rownames(otu_img) <- otu_img$img_genome_id
-  otu_img <- otu_img[otu_img$img_genome_id %in% img_ko$GenomeID,]
+  otu_img <- otu_img[otu_img$img_genome_id %in% img_x[,1],] #map must be first column
   otu_img <- otu_img[otu_img$X.gg_id %in% tree$tip.label,]
   
   tree_pruned <- drop.tip(tree,tip=tree$tip.label[!(tree$tip.label %in% otu_img$X.gg_id)])
   
-  traits_pruned <- img_ko[img_ko$GenomeID %in% otu_img$img_genome_id,]
-  rownames(traits_pruned) <- otu_img[as.character(traits_pruned$GenomeID),'X.gg_id']
-  traits_pruned <- traits_pruned[,-1]
+  traits_pruned <- img_x[img_x[,1] %in% otu_img$img_genome_id,]
+  rownames(traits_pruned) <- otu_img[as.character(traits_pruned[,1]),'X.gg_id']
+  traits_pruned <- traits_pruned[,-1,drop=FALSE]
   
-  out <- list(traits_pruned=traits_pruned,tree_pruned=tree_pruned,tree=tree)
+  return(list(tree=tree_pruned,traits=traits_pruned))
+  
+}
+
+
+format_tree_and_traits <- function(tree,verbose=FALSE){
+  
+  if (verbose) cat('Loading tree and traits... ')
+  img_ko <- read.delim(file.path(attr(tree,'path'),'IMG_ko_counts.tab'),sep='\t')
+  img_16s <- read.delim(file.path(attr(tree,'path'),'IMG_16S_counts.tab'),sep='\t')
+  otu_img <- read.delim(file.path(attr(tree,'path'),'gg_13_5_img.txt'),sep='\t')
   if (verbose) cat('complete.\n')
+  
+  
+  if (verbose) cat('Formatting tree and traits... ')
+  pruned_ko <- prune_tree_and_traits(tree,img_ko,otu_img)
+  pruned_16s <- prune_tree_and_traits(tree,img_16s,otu_img)
+  if (verbose) cat('complete.\n')
+  
+  out <- list(ko=pruned_ko,`16s`=pruned_16s,tree=tree)
   
   return(out)
   
 }
 
+
 asr <- function(tree,traits){
   
-  traits <- traits[tree$tip.label,]
+  traits <- traits[tree$tip.label,,drop=FALSE]
   
   reconstructions <- apply(traits,2,ace,tree,type='continuous',method='pic') 
   
@@ -185,8 +211,7 @@ asr <- function(tree,traits){
 
 predict_traits <- function(traits,traits_asr,tree){
   
-  traits_asr <- readRDS('~/rcrust/asr.rds')
-  traits <- traits[,colnames(traits_asr)]
+  traits <- traits[,colnames(traits_asr),drop=FALSE]
   traits <- as.matrix(rbind(traits_asr,traits))
 
   node_dist <- dist.nodes(tree)
@@ -213,7 +238,6 @@ predict_traits <- function(traits,traits_asr,tree){
     
     pred <- round(predict_tip(tree,i,mrra,mrra_idx,traits,node_dist))
     
-    
     if (node_to_predict %in% rownames(traits)){
       recons[node_to_predict,] <- traits[node_to_predict,]
     }else{
@@ -230,18 +254,32 @@ abundance <- readRDS('~/rcrust/seqtab.rds')
 path <- '~/rcrust/reference_files'
 
 fasta <- create_fasta(abundance,path,FALSE,verbose=TRUE)
-tree_and_traits <- create_tree_and_traits(fasta,ncores=50,verbose=TRUE)
-asr_traits <- asr(tree_and_traits$tree_pruned,tree_and_traits$traits_pruned)
-reconstruction <- predict_traits(tree_and_traits$traits_pruned,asr_traits,tree_and_traits$tree)
+tree <- create_tree(fasta,dist.ml,nj,ncores=50,verbose=TRUE)
+write.tree(tree,'~/rcrust/testing_workflow/rtree.tree')
+
+tree_and_traits <- format_tree_and_traits(tree,verbose=TRUE)
+
+asr_traits_ko <- asr(tree_and_traits$ko$tree,tree_and_traits$ko$traits)
+asr_traits_16s <- asr(tree_and_traits$`16s`$tree,tree_and_traits$`16s`$traits)
+
+reconstruction_ko <- predict_traits(tree_and_traits$ko$traits,asr_traits_ko,tree_and_traits$tree)
+reconstruction_16s <- predict_traits(tree_and_traits$`16s`$traits,asr_traits_16s,tree_and_traits$tree)
 
 
 
 # answer
-final_picrust_table <- read.delim('~/rcrust/new_refs/ko_13_5_precalculated.tab',sep='\t')
-rownames(final_picrust_table) <- final_picrust_table$X.OTU_IDs
-final_picrust_table <- final_picrust_table[,-1]
-cbind(rowSums(final_picrust_table[sort(rownames(final_picrust_table)[grepl('study',rownames(final_picrust_table))]),]),
-      rowSums(reconstruction[sort(rownames(reconstruction)[grepl('rsv',rownames(reconstruction))]),]))
+final_picrust_table_ko <- read.delim('~/rcrust/testing_workflow/out/new_refs/ko_13_5_precalculated.tab.gz',sep='\t')
+rownames(final_picrust_table_ko) <- final_picrust_table_ko$X.OTU_IDs
+final_picrust_table_ko <- final_picrust_table_ko[,-1]
+
+final_picrust_table_16s <- read.delim('~/rcrust/testing_workflow/out/new_refs/16S_13_5_precalculated.tab.gz',sep='\t')
+rownames(final_picrust_table_16s) <- final_picrust_table_16s$X.OTU_IDs
+final_picrust_table_16s <- final_picrust_table_16s[,-1,drop=FALSE]
+
+
+# check
+cbind(rowSums(reconstruction_ko),rowSums(final_picrust_table_ko[rownames(reconstruction_ko),]))
+cbind(reconstruction_16s,final_picrust_table_16s[rownames(reconstruction_16s),])
 
 
 # ddna <- dist.dna(alignment_phydat)
@@ -265,4 +303,5 @@ cbind(rowSums(final_picrust_table[sort(rownames(final_picrust_table)[grepl('stud
 # write.table(as.character(id(fasta)),file='~/rcrust/traits_sample_filter.txt',sep='\t',quote=FALSE,col.names=FALSE,row.names=FALSE)
 # 
 # saveRDS(fasta,'~/rcrust/fasta.rds')
+
 
