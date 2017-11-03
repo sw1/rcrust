@@ -8,3 +8,11 @@ asr*
 asr/
 .Rproj.user
 .Rproj.user/**
+testing_workflow/
+new_ref/
+reference_files/
+out/
+asr/
+gg_13_5_study_db_aligned/
+MiSeq_SOP/
+dhantha_data/

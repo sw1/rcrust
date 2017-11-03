@@ -1,0 +1,36 @@
+targets := node_to_predict
+siblings := parent_node.child
+mra := most_recent_reconstructed_ancestor
+
+from tree.tips:
+  targets <- tips
+  
+results <- vector(mode='numeric',length(targets))
+names(results) <- targets
+for targets:
+  trait_target <- trait_table.row[target]
+  
+  parent <- target.parent
+  siblings <- parent.children
+  ancestor <- mra(id,trait_target)
+  
+  trait_ancestor <- trait_table.row[ancestor]
+  
+  d <- distance(ancestor,parent)
+  w <- rescale(d)
+  pred <- trait_ancestor * w
+  w_total <- rep(w,len(trait_ancestor))
+  
+  for siblings:
+    traits_sibling <- trait_table.row[sibling]
+    d <- distance(sibling,parent) 
+    w <- rescale(d)
+    
+    if is.null(mra):
+      w_total <- rep(w,len(trait_siblings))
+      pred <- trait_sibling * w_total
+    else:
+      pred += trait_sibling * w
+      w_total += w
+      
+  results[target] <- round(pred)

@@ -119,7 +119,7 @@ create_fasta <- function(abundance,path,rows_are_taxa,verbose=FALSE){
 
 create_tree <- function(fasta,fun_dist,fun_tree,ncores=1,verbose=FALSE){
   
-  fun_dist <- match.fun(fun_dist)
+  fun_dist <- match.fun(fun_dist) 
   fun_tree <- match.fun(fun_tree)
   
   if (verbose) cat('Performing alignment... ')
@@ -253,29 +253,93 @@ predict_traits <- function(traits,traits_asr,tree){
   
 }
 
-abundance <- readRDS('~/rcrust/seqtab.rds')
-path <- '~/rcrust/reference_files'
+abundance <- readRDS('~/Documents/rcrust/rsv.rds')
+path <- '~/Documents/rcrust/reference_files'
+
+# change dist.ml
+# change nj
 
 fasta <- create_fasta(abundance,path,FALSE,verbose=TRUE)
+## save the fasta file
+#saveRDS(fasta,'~/Documents/rcrust/alignment_rsv.rds')
+
 tree <- create_tree(fasta,dist.ml,nj,ncores=50,verbose=TRUE)
-write.tree(tree,'~/rcrust/testing_workflow/rtree.tree')
+write.tree(tree,'~/Documents/rcrust/testing_workflow/rsv.tree')
 
 tree_and_traits <- format_tree_and_traits(tree,verbose=TRUE)
 
 asr_traits_ko <- asr(tree_and_traits$ko$tree,tree_and_traits$ko$traits)
 asr_traits_16s <- asr(tree_and_traits$`16s`$tree,tree_and_traits$`16s`$traits)
 
+# save the asr and compare
+saveRDS(asr_traits_ko,'~/Documents/rcrust/testing_workflow/asr_rsv_ko.rds')
+saveRDS(asr_traits_16s,'~/Documents/rcrust/testing_workflow/asr_rsv_16s.rds')
+
 reconstruction_ko <- predict_traits(tree_and_traits$ko$traits,asr_traits_ko,tree_and_traits$tree)
 reconstruction_16s <- predict_traits(tree_and_traits$`16s`$traits,asr_traits_16s,tree_and_traits$tree)
 
+saveRDS(reconstruction_ko,'~/Documents/rcrust/testing_workflow/reconstruction_ko.rds')
+saveRDS(reconstruction_16s,'~/Documents/rcrust/testing_workflow/reconstruction_16s.rds')
+
+
+########
+
+abundance <- readRDS('~/Documents/rcrust/rsv.rds')
+colnames(abundance) <- paste('rsv',1:ncol(abundance),sep='_')
+
+abundance_norm <- round(t(t(abundance)/reconstruction_16s[colnames(abundance),]))
+
+fxns <- reconstruction_ko[colnames(abundance_norm),]
+ids <- intersect(colnames(abundance_norm),rownames(fxns))
+
+fxns <- fxns[ids,]
+abundance_norm <- abundance_norm[,ids]
+
+predictions <- round(abundance_norm %*% fxns)
+predictions_norm <- predictions/rowSums(predictions)
+
+truth <- read.delim('~/Downloads/kos.tsv.gz',sep='\t')
+rownames(truth) <- truth$X..Gene.Family
+truth <- truth[,-1]
+truth <- truth[!grepl('\\|',rownames(truth)),]
+truth <- truth[-c(1:2),]
+
+mapping <- read.csv('~/Documents/rcrust/wgs_amp_mapping.txt',stringsAsFactors=FALSE)
+# 
+# # rename the headers in truth to match
+# for (i in 1:length(names(truth))){
+#   names(truth)[i] <- substr(names(truth)[i],1,10)
+# }
+
+pred_ss <- predictions[rownames(predictions) %in% mapping$amp_err,]
+rownames(pred_ss) <- mapping$wgs_id[match(rownames(pred_ss),mapping$amp_err)]
+truth_ss <- t(truth)
+rownames(truth_ss) <- mapping$wgs_id[match(gsub('^(SRR[0-9]+)_Abundance.RPKs$','\\1',rownames(truth_ss)),mapping$wgs_srr)]
+truth_ss <- truth_ss[rownames(pred_ss),]
+
+truth_ss <- truth_ss/rowSums(truth_ss)
+pred_ss <- pred_ss/rowSums(pred_ss)
+
+x <- truth_ss[1,intersect(colnames(truth_ss),colnames(pred_ss))]
+y <- pred_ss[1,intersect(colnames(truth_ss),colnames(pred_ss))]
+cor(x,y)
+qplot(x,y,geom='point',alpha=.4) + geom_smooth(method='lm',color='red') + scale_x_log10() + scale_y_log10()
+
+
+# # rename the 1st col in predictions to match
+# for (i in 1:length(rownames(predictions))){
+#   rownames(predictions)[i] <- substr(rownames(predictions)[i],1,9)
+# }
+
+# filter the predictions table
 
 
 # answer
-final_picrust_table_ko <- read.delim('~/rcrust/testing_workflow/out/new_refs/ko_13_5_precalculated.tab.gz',sep='\t')
+final_picrust_table_ko <- read.delim('~/Documents/rcrust/testing_workflow/out/new_refs/ko_13_5_precalculated.tab.gz',sep='\t')
 rownames(final_picrust_table_ko) <- final_picrust_table_ko$X.OTU_IDs
 final_picrust_table_ko <- final_picrust_table_ko[,-1]
 
-final_picrust_table_16s <- read.delim('~/rcrust/testing_workflow/out/new_refs/16S_13_5_precalculated.tab.gz',sep='\t')
+final_picrust_table_16s <- read.delim('~/Documents/rcrust/testing_workflow/out/new_refs/16S_13_5_precalculated.tab.gz',sep='\t')
 rownames(final_picrust_table_16s) <- final_picrust_table_16s$X.OTU_IDs
 final_picrust_table_16s <- final_picrust_table_16s[,-1,drop=FALSE]
 
@@ -299,12 +363,7 @@ which(reconstruction_16s != final_picrust_table_16s[rownames(reconstruction_16s)
 
 # ape::write.tree(tree,'~/rcrust/tree.tree')
 
-
-
-# 
 # writeFasta(fasta,file='~/rcrust/gg_13_5_study_db.fasta')
 # write.table(as.character(id(fasta)),file='~/rcrust/traits_sample_filter.txt',sep='\t',quote=FALSE,col.names=FALSE,row.names=FALSE)
 # 
 # saveRDS(fasta,'~/rcrust/fasta.rds')
-
-

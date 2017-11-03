@@ -4,7 +4,7 @@ library(DECIPHER)
 
 align_seqs <- '/usr/local/bin/align_seqs.py'
 
-fasta <- readRDS('~/rcrust/fasta.rds')
+fasta <- readRDS('~/Documents/rcrust/fasta.rds')
 
 ### do alignment
 seqs <- sread(fasta)
